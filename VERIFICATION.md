@@ -9,6 +9,6 @@ Verified in the build workspace:
 
 Not verified: real SMS/email delivery, signed provider callback round trips, Google OAuth/review ingestion, Supabase-hosted migration/Auth behavior, and browser visual/accessibility interactions. These need configured services or browser access.
 
-Source is committed locally. GitHub source upload was attempted through both Git and the GitHub connector. Both returned HTTP 403; the connector's message was `Resource not accessible by integration`. Public repository metadata is readable, but authenticated content writes are blocked. Nothing has been pushed by this build.
+GitHub write access has been restored and verified through the GitHub connector. The owner-created initial commit is preserved in the repository history alongside the application commits. Source repository: https://github.com/polancojoseph1/local-presence-engine.
 
 No live Vercel/Supabase/Twilio/Resend/Google deployment has been activated. No service credentials are configured in this workspace. See README.md for exact setup and operating instructions. No customer messages were sent.
