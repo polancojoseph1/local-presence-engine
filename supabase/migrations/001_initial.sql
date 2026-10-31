@@ -1,0 +1,57 @@
+create extension if not exists pgcrypto;
+create table public.organizations(id uuid primary key default gen_random_uuid(),name text not null,slug text not null unique default encode(gen_random_bytes(10),'hex'),brand_color text not null default '#24785c',google_url text not null default '',owner_email text not null,template text not null default 'Hi {{name}}, thanks for visiting {{business}}! Share your experience: {{link}}',reminder_days integer not null default 3 check(reminder_days between 1 and 14),notifications boolean not null default true,created_at timestamptz default now());
+create table public.memberships(user_id uuid references auth.users on delete cascade,org_id uuid references public.organizations on delete cascade,primary key(user_id,org_id),unique(user_id));
+create table public.customers(id uuid primary key default gen_random_uuid(),org_id uuid not null references public.organizations on delete cascade,name text not null,email text,phone text,email_consent boolean not null default false,sms_consent boolean not null default false,opted_out boolean not null default false,consent_at timestamptz,created_at timestamptz default now(),unique(org_id,email),unique(org_id,phone),unique(id,org_id));
+create table public.requests(id uuid primary key default gen_random_uuid(),org_id uuid not null references public.organizations on delete cascade,customer_id uuid not null,token uuid not null unique default gen_random_uuid(),channel text not null check(channel in ('sms','email')),clicked_at timestamptz,created_at timestamptz default now(),foreign key(customer_id,org_id) references public.customers(id,org_id));
+create unique index one_request_daily on public.requests(customer_id,((created_at at time zone 'UTC')::date));
+create table public.messages(id uuid primary key default gen_random_uuid(),org_id uuid not null references public.organizations on delete cascade,request_id uuid not null references public.requests on delete cascade,step integer not null,status text not null default 'queued' check(status in ('queued','processing','sent','delivered','failed','cancelled','unknown')),due_at timestamptz not null,provider_id text,error text,claimed_at timestamptz,created_at timestamptz default now(),unique(request_id,step));
+create table public.feedback(id uuid primary key default gen_random_uuid(),org_id uuid not null references public.organizations on delete cascade,request_id uuid unique references public.requests,body text not null check(length(body) between 1 and 4000),created_at timestamptz default now());
+create table public.reviews(id text primary key,org_id uuid not null references public.organizations on delete cascade,author text not null,rating integer not null check(rating between 1 and 5),body text not null default '',published_at timestamptz not null,created_at timestamptz default now());
+create table public.review_stats(org_id uuid primary key references public.organizations on delete cascade,total integer not null,average numeric,synced_at timestamptz default now());
+create table public.google_connections(org_id uuid primary key references public.organizations on delete cascade,refresh_token text not null,location text not null default '',last_sync timestamptz);
+create table public.notifications(id uuid primary key default gen_random_uuid(),org_id uuid not null references public.organizations on delete cascade,review_id text not null references public.reviews,emailed boolean default false,unique(org_id,review_id));
+create function public.my_org() returns uuid language sql stable security definer set search_path=public as $$select org_id from memberships where user_id=auth.uid()$$;
+revoke all on function public.my_org() from public; grant execute on function public.my_org() to authenticated;
+alter table public.organizations enable row level security;
+alter table public.memberships enable row level security;
+alter table public.customers enable row level security;
+alter table public.requests enable row level security;
+alter table public.messages enable row level security;
+alter table public.feedback enable row level security;
+alter table public.reviews enable row level security;
+alter table public.review_stats enable row level security;
+alter table public.google_connections enable row level security;
+alter table public.notifications enable row level security;
+create policy tenant_read on public.customers for select to authenticated using(org_id=public.my_org());
+create policy tenant_read on public.requests for select to authenticated using(org_id=public.my_org());
+create policy tenant_read on public.messages for select to authenticated using(org_id=public.my_org());
+create policy tenant_read on public.feedback for select to authenticated using(org_id=public.my_org());
+create policy tenant_read on public.reviews for select to authenticated using(org_id=public.my_org());
+create policy tenant_read on public.review_stats for select to authenticated using(org_id=public.my_org());
+create policy tenant_read on public.notifications for select to authenticated using(org_id=public.my_org());
+create policy org_read on public.organizations for select to authenticated using(id=public.my_org());
+create policy membership_read on public.memberships for select to authenticated using(user_id=auth.uid());
+create function public.onboard(business text) returns uuid language plpgsql security definer set search_path=public as $$declare oid uuid; begin
+if auth.uid() is null then raise exception 'Unauthorized'; end if;
+if exists(select 1 from memberships where user_id=auth.uid()) then raise exception 'Already onboarded'; end if;
+if length(trim(business)) not between 1 and 100 then raise exception 'Invalid business'; end if;
+insert into organizations(name,owner_email) values(trim(business),(select email from auth.users where id=auth.uid())) returning id into oid;
+insert into memberships values(auth.uid(),oid); return oid; end $$;
+revoke all on function public.onboard(text) from public;grant execute on function public.onboard(text) to authenticated;
+create function public.enqueue_review(oid uuid,cid uuid,ch text) returns uuid language plpgsql security definer set search_path=public as $$declare rid uuid; c customers; days integer; begin
+if auth.uid() is null or oid is distinct from public.my_org() then raise exception 'Unauthorized';end if;
+select * into c from customers where id=cid and org_id=oid for update;
+if c.id is null or c.opted_out or (ch='sms' and (not c.sms_consent or c.phone is null)) or (ch='email' and (not c.email_consent or c.email is null)) then raise exception 'Customer lacks consent or is opted out';end if;
+if (select google_url='' from organizations where id=oid) then raise exception 'Configure Google review link first';end if;
+insert into requests(org_id,customer_id,channel) values(oid,cid,ch) returning id into rid;
+select reminder_days into days from organizations where id=oid;
+insert into messages(org_id,request_id,step,due_at) values(oid,rid,0,now()),(oid,rid,1,now()+make_interval(days=>days));return rid;end $$;
+revoke all on function public.enqueue_review(uuid,uuid,text) from public;grant execute on function public.enqueue_review(uuid,uuid,text) to authenticated;
+create function public.claim_messages() returns setof public.messages language plpgsql security definer set search_path=public as $$begin update messages set status='queued' where status='processing' and claimed_at<now()-interval '10 minutes';return query update messages set status='processing',claimed_at=now() where id in(select id from messages where status='queued' and due_at<=now() order by due_at for update skip locked limit 10) returning *;end $$;
+revoke all on function public.claim_messages() from public,anon,authenticated;grant execute on function public.claim_messages() to service_role;
+-- Global suppression for a shared sender; no client access to this table.
+create table public.suppressions(destination text primary key,created_at timestamptz not null default now());
+alter table public.suppressions enable row level security;
+create function public.apply_suppression() returns trigger language plpgsql security definer set search_path=public as $$begin
+if exists(select 1 from suppressions where destination=new.phone or destination=new.email) then new.opted_out=true;end if;return new;end$$;
+create trigger suppress_customer before insert or update on public.customers for each row execute function public.apply_suppression();

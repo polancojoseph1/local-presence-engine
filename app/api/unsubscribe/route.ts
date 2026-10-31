@@ -1,0 +1,2 @@
+import {admin} from '@/lib/supabase';import {z} from 'zod';
+export async function POST(req:Request){const token=new URL(req.url).searchParams.get('t');if(!z.uuid().safeParse(token).success)return new Response('Invalid link',{status:400});const db=admin();const {data:r}=await db.from('requests').select('customer_id,org_id').eq('token',token).single();if(!r)return new Response('Invalid link',{status:404});await db.from('customers').update({opted_out:true}).eq('id',r.customer_id).eq('org_id',r.org_id);return Response.json({ok:true})}
