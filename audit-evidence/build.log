@@ -1,0 +1,63 @@
+
+> local-presence-engine@0.1.0 build
+> next build
+
+▲ Next.js 16.4.3 (Turbopack)
+✓ Running next.config.ts took 24ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 511ms
+  Running TypeScript ...
+  Finished TypeScript in 2.6s ...
+  Collecting page data using 2 workers ...
+  Generating static pages using 2 workers (0/34) ...
+  Generating static pages using 2 workers (8/34)
+  Generating static pages using 2 workers (16/34)
+  Generating static pages using 2 workers (25/34)
+✓ Generating static pages using 2 workers (34/34) in 275ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/assets
+├ ƒ /api/click
+├ ƒ /api/cron
+├ ƒ /api/cron/sequence-runner
+├ ƒ /api/cron/sync-google-reviews
+├ ƒ /api/customers
+├ ƒ /api/customers/import
+├ ƒ /api/feedback
+├ ƒ /api/feedback/resolve
+├ ƒ /api/google/callback
+├ ƒ /api/google/connect
+├ ƒ /api/google/location
+├ ƒ /api/logout
+├ ƒ /api/members
+├ ƒ /api/onboard
+├ ƒ /api/organization
+├ ƒ /api/requests
+├ ƒ /api/requests/send
+├ ƒ /api/reviews
+├ ƒ /api/settings
+├ ƒ /api/templates
+├ ƒ /api/unsubscribe
+├ ƒ /api/webhooks/resend
+├ ƒ /api/webhooks/twilio
+├ ƒ /api/webhooks/twilio/inbound
+├ ƒ /api/webhooks/twilio/status
+├ ƒ /auth/callback
+├ ƒ /b/[slug]
+├ ƒ /dashboard/[[...section]]
+├ ○ /demo/google-review
+├ ○ /login
+├ ƒ /r/[slug]
+├ ○ /unsubscribe
+├ ƒ /widget.js
+└ ƒ /widget/[slug]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

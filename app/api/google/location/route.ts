@@ -1,4 +1,40 @@
-import {owner,admin} from '@/lib/supabase';import {accessToken,locations} from '@/lib/google';import {failure,checkOrigin} from '@/lib/http';
-async function get(){const {orgId}=await owner();const {data:c}=await admin().from('google_connections').select('*').eq('org_id',orgId).single();if(!c)throw new Error('Connect Google first');return {orgId,choices:await locations(await accessToken(c.refresh_token))}}
-export async function GET(){try{return Response.json((await get()).choices)}catch(e){return failure(e)}}
-export async function POST(req:Request){try{checkOrigin(req);const {orgId,choices}=await get();const {location}=await req.json();if(!choices.some(l=>l.name===location))throw new Error('Select a location you manage');const {error}=await admin().from('google_connections').update({location,last_sync:null}).eq('org_id',orgId);if(error)throw error;return Response.json({ok:true})}catch(e){return failure(e)}}
+import { manager, admin } from "@/lib/supabase";
+import { accessToken, locations } from "@/lib/google";
+import { failure, checkOrigin } from "@/lib/http";
+async function get() {
+  const { orgId } = await manager();
+  const { data: c } = await admin()
+    .from("google_connections")
+    .select("*")
+    .eq("org_id", orgId)
+    .single();
+  if (!c) throw new Error("Connect Google first");
+  return {
+    orgId,
+    choices: await locations(await accessToken(c.refresh_token)),
+  };
+}
+export async function GET() {
+  try {
+    return Response.json((await get()).choices);
+  } catch (e) {
+    return failure(e);
+  }
+}
+export async function POST(req: Request) {
+  try {
+    checkOrigin(req);
+    const { orgId, choices } = await get();
+    const { location } = await req.json();
+    if (!choices.some((l) => l.name === location))
+      throw new Error("Select a location you manage");
+    const { error } = await admin()
+      .from("google_connections")
+      .update({ location, last_sync: null })
+      .eq("org_id", orgId);
+    if (error) throw error;
+    return Response.json({ ok: true });
+  } catch (e) {
+    return failure(e);
+  }
+}

@@ -3,3 +3,11 @@ node_modules/
 .env*
 !.env.example
 *.tsbuildinfo
+test-results/
+playwright-report/
+audit-evidence/*
+!audit-evidence/*.png
+!audit-evidence/*.log
+!audit-evidence/browser-summary.json
+DEMO-AUDIT.md
+audit-evidence/app-preview.png

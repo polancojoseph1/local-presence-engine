@@ -1,0 +1,20 @@
+
+> local-presence-engine@0.1.0 test
+> node --import tsx --test tests/*.test.ts
+
+✔ consent is per channel and opt-out always wins (0.811115ms)
+✔ imports reject invalid contact data and default consent off (3.446959ms)
+✔ Google destination rejects deceptive hosts and executable URLs (0.393861ms)
+✔ templates replace literal placeholders without treating values as regex replacements (0.267764ms)
+✔ Google refresh tokens are encrypted and tamper-evident (1.108113ms)
+✔ database tenant isolation, consent enforcement, deduplication and queue claims (1881.954162ms)
+✔ sender identification, normalization, direct links and consent evidence (5.369622ms)
+✔ upgraded schema: roles, multi-tenant metrics, immediate cancellation, seed, templates and reports (2313.969599ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5590.590162

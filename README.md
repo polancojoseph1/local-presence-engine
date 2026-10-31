@@ -1,74 +1,117 @@
-# LocalLoop — Review & Local Presence Engine
+# LocalLoop — Review and Local Presence Engine
 
-A Next.js App Router + React SaaS MVP for local service businesses. Supabase Auth/Postgres, Twilio SMS, Resend email, and Google Business Profile review sync. Designed for Vercel. The unconfigured local app shows **explicitly labeled sample data**; it cannot send messages or persist changes.
+Multi-tenant Next.js App Router / TypeScript / React / Tailwind application with Supabase Auth/Postgres, Twilio SMS, Resend email, Google Business Profile review ingestion, QR print assets, and an embeddable review widget.
 
-## Run locally
+## Run the two-minute demo
 
-Requires Node 22+.
+Requires Node 22+. No provider credentials are needed for the labeled fictional demo.
 
 ```sh
 npm ci
-cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000. Without Supabase configuration, explore the demo. Add real configuration to enable email-link login and durable tenant data. Never commit `.env.local` or service credentials.
+1. Open `http://localhost:3000/dashboard`: Brooklyn Corner Barbers, sample customers, delivery states, Google reviews, feedback, and metrics.
+2. Open `/r/demo-visit` on a phone: Google review CTA is visible immediately, alongside optional private feedback. Demo CTA opens an explanatory demo screen; it never solicits a real review for a fictional business.
+3. Open `/dashboard/send`: show the name/contact/consent quick-send flow. Demo actions never send or persist live messages.
+4. Open `/dashboard/qr`: scan the QR or download PNG, SVG, or a two-page PDF containing a counter card and foldable table tent.
+5. Open `/dashboard/widget` and `/dashboard/reports`: show the embed snippet and sample Premium report.
 
-```sh
-npm run typecheck
-npm test
-npm run build
+When demonstrating with your phone, use a reachable deployment or development-host address. A phone cannot reach another computer's `localhost`. The app generates QR URLs from the page origin in the browser; set `APP_URL` to your reachable HTTPS origin for server-generated assets.
+
+## Application routes
+
+- `/dashboard`, `/dashboard/send`, `/dashboard/customers`, `/dashboard/templates`, `/dashboard/qr`, `/dashboard/reviews`, `/dashboard/widget`, `/dashboard/reports`, `/dashboard/settings`, `/dashboard/operator`.
+- `/r/[token]` for tracked review requests; legacy `/r/[businessSlug]?t=UUID` remains supported.
+- `/b/[orgSlug]` for anonymous QR visitors. Private feedback is available without making a Google review conditional on it.
+- `/widget/[orgSlug]`, `/widget.js`, `/unsubscribe?t=UUID`.
+
+The root `/` also opens the owner dashboard. Tabs update the URL and support direct links. Staff can manage customer/request work; business settings, access, templates, and manual review-assistance changes require owner/operator permissions on the server. Global operators can see and select all businesses; owners/staff see only their memberships.
+
+## Database setup and upgrades
+
+Create a Supabase project. Run **all** SQL files in `supabase/migrations/` in numeric order. Existing installations that already applied 001 and 002 apply only **003_complete_engine.sql**. Do not rerun earlier migrations on an existing database.
+
+Migration 003 is additive and retains existing customers, review requests, and reviews. It replaces the original one-business-per-user constraint with memberships and roles, and adds consent proof, channel opt-outs, queue cancellation triggers, templates, reports, notifications, and server-side aggregate metrics. Existing consent records without a source cannot enroll in new campaigns until the operator supplies genuine consent evidence; the migration does not invent that evidence.
+
+The original tables retain their names for compatibility. Specification names `organization_members`, `review_requests`, `google_reviews`, and `private_feedback` are security-invoker views over the RLS-protected tables. `customers` exposes generated specification aliases, including `organization_id`, `full_name`, `phone_e164`, `consent_given`, and `consent_timestamp`. `organizations.google_review_url` aliases the original `google_url`. Application domain and database types live in `lib/types.ts` and `lib/database.types.ts`.
+
+Optional fictional database demo: run `supabase/seed.sql` **after all migrations**. It is repeatable and includes a demo token, customers with opt-outs, reviews across ratings, templates, feedback, metrics, and a monthly report. It does not create an Auth user or seed a password. Link an existing Auth user:
+
+```sql
+insert into public.memberships(user_id,org_id,role)
+values ('YOUR_EXISTING_AUTH_USER_UUID','d0000000-0000-4000-8000-000000000001','owner')
+on conflict(user_id,org_id) do nothing;
 ```
 
-Tests exercise consent, input validation, Google URL validation, token encryption/tampering, and the actual SQL migration using embedded Postgres (PGlite). Database tests check tenant isolation, denied writes, cross-tenant request rejection, deduplication, suppression, and exclusive queue claims. PGlite uses an auth stub and a replacement random-bytes function; production uses Supabase Auth and pgcrypto. Real provider, OAuth, carrier, and deployed browser tests require configured accounts.
+The reserved `brooklyn-corner-demo` tenant cannot send customer campaigns, even with providers configured. Use a separately onboarded real business for live acceptance tests.
 
-## Production setup
+Provision a trusted global operator in the Supabase SQL editor:
 
-1. **GitHub**: create a private `local-presence-engine` repository and push this directory. No secrets are tracked. GitHub Actions runs typecheck, tests, and build.
-2. **Supabase**: create a project. Apply the SQL files in `supabase/migrations/` in numeric order through the SQL editor or Supabase CLI. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. The service role is server-only and must never use a `NEXT_PUBLIC_` name. Configure Auth Site URL to your final HTTPS URL and allow `/auth/callback` as a redirect. Configure a production SMTP sender for authentication email; the app's Resend key does not configure Supabase Auth SMTP.
-3. **Vercel**: import the repository as a Next.js project. Add environment variables from `.env.example`, with `APP_URL` set to the exact canonical HTTPS origin (no trailing slash). Deploy. Use a plan that supports 10-minute cron scheduling and 300-second functions; the included Vercel cron runs `/api/cron` every 10 minutes with `Authorization: Bearer $CRON_SECRET`. For a different host, schedule that authenticated endpoint externally. Generate a strong CRON_SECRET. Never expose the cron route without it.
-4. **Twilio**: configure a Messaging Service with an approved sending number and applicable A2P/10DLC registration (or your jurisdiction's equivalent). Set the account SID, auth token, and messaging service SID. Enable Advanced Opt-Out. Set inbound message/opt-out webhook to `https://YOUR_DOMAIN/api/webhooks/twilio` (POST). Status callbacks are included on outbound messages. Signature verification uses `APP_URL`, which must match Twilio's public callback origin. Carrier/A2P charges apply in addition to SMS usage.
-5. **Resend**: verify your sending domain and set `RESEND_API_KEY` and `EMAIL_FROM`. Add webhook `https://YOUR_DOMAIN/api/webhooks/resend` for delivered, bounced, complained, and failed email events. Set `RESEND_WEBHOOK_SECRET` to the signing secret. Signatures are verified before status/suppression updates.
-6. **Google**: create OAuth web credentials. Enable Business Profile Account Management, Business Information, and Google My Business APIs and obtain required API access approval. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI=https://YOUR_DOMAIN/api/google/callback`. Configure the consent screen and required OAuth verification before broad external launch. Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -hex 32`; keep it stable and securely backed up. Refresh tokens are encrypted with AES-256-GCM. Changing the key requires reconnecting all accounts.
-7. **Owner onboarding**: sign in through the email link, create a business workspace, add the direct Google review URL and branding in Settings, connect Google, load managed locations, and select a location. The next cron imports review history. Initial import does not send historical-review notifications; subsequent newly detected reviews create notifications and owner emails.
-8. **Launch smoke test**: use two owner accounts and two businesses; verify each sees only their own records. Add a consented test contact you control, queue one email and one SMS on different days/contacts, run cron, inspect delivery callbacks, open the review page, submit feedback, and opt out. Confirm future sends cancel. Test QR scanning and widget embedding on your website. Verify counts against the Google Business Profile and confirm a new review produces an owner notification. This live smoke test has not been run without credentials.
+```sql
+insert into public.operators(user_id) values ('YOUR_EXISTING_AUTH_USER_UUID');
+```
 
-Source repository: https://github.com/polancojoseph1/local-presence-engine. The repository was created by the owner. Live deployment and provider activation require the configuration above; a successful source push does not activate services.
+No browser/API can self-promote to global operator. The operator screen can onboard tenants and add existing authenticated users to a business by UUID; it does not send unsolicited invitation emails. Tenant selection uses an HTTP-only cookie that is revalidated against membership/operator access on every server operation.
 
-## Interface
+## Configure real services
 
-The owner dashboard, login, public review pages, and widget use a dark charcoal palette with blue accents. At tablet and phone sizes the sidebar becomes a dismissible drawer with keyboard focus handling. Customer tables become labeled cards on small screens; reviews, settings, QR assets, forms, and dialogs reflow without hiding content. New businesses start with blue branding; existing configured branding is retained.
+Copy `.env.example` to `.env.local` for development; configure the same values in Vercel for deployment. Never commit credentials.
 
-## Features
+- **Supabase:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, server-only `SUPABASE_SERVICE_ROLE_KEY`. Set Auth Site URL to your final HTTPS origin and allow `/auth/callback`. Configure Supabase Auth SMTP separately; the application's Resend API key does not configure magic-link email delivery.
+- **Canonical origin:** `APP_URL` must be the exact public HTTPS origin, with no trailing slash. It is used for provider callback signatures, OAuth, messages, and printable assets.
+- **Twilio:** configure an approved US A2P 10DLC campaign and Messaging Service. Set account SID, auth token, Messaging Service SID, and set `TWILIO_A2P_APPROVED=true` only after approval. Enable Advanced Opt-Out. Inbound callback: `POST /api/webhooks/twilio/inbound`. Status URLs are attached to outgoing messages. The old combined `/api/webhooks/twilio` endpoint remains supported. Signed callbacks are validated against `APP_URL` plus the exact callback path/query.
+- **Resend:** verify the sending domain and set `RESEND_API_KEY` and `EMAIL_FROM`. Subscribe `/api/webhooks/resend` to delivered, bounced, complained, and failed events. Set `RESEND_WEBHOOK_SECRET`. Email uses RFC one-click unsubscribe headers and an unsubscribe link in the body.
+- **Google:** enable Business Profile Account Management, Business Information, and Google My Business APIs; obtain required access approval and OAuth verification. Set client ID, client secret, and `GOOGLE_REDIRECT_URI=https://YOUR_DOMAIN/api/google/callback`. Set `TOKEN_ENCRYPTION_KEY` to 32 random bytes encoded as 64 hex characters (`openssl rand -hex 32`). Keep it stable and backed up. Owners/operators connect Google and select a managed location in Settings. OAuth state is bound to the initiating tenant. First sync imports history without historical-review alerts; later new reviews queue owner alerts.
+- **Scheduling:** set a strong `CRON_SECRET`. The included Vercel schedule calls authenticated `GET /api/cron` every ten minutes; this runs follow-ups, Google sync, monthly reporting, and notification delivery independently. Select a Vercel plan supporting the cadence and 300-second function duration. An external scheduler may instead call authenticated `POST /api/cron/sequence-runner` and `POST /api/cron/sync-google-reviews`. Both require `Authorization: Bearer YOUR_CRON_SECRET`. Keep the combined cron scheduled for monthly reports and notification retry processing.
 
-- Email magic-link owner signup/login and one organization workspace per owner.
-- Tenant-scoped customers, requests, messages, private feedback, reviews, stats, and notifications. Database RLS protects reads. Mutations validate the session/tenant server-side; enqueue and onboarding use restricted database functions.
-- Manual customer entry and CSV import (500-row maximum, international E.164 phones, explicit channel consent flags, atomic duplicate rejection). Template: `public/customers-template.csv`.
-- One request per customer per UTC day. Initial SMS/email plus one scheduled reminder, configurable 1–14 days. Consent and opt-out are checked again immediately before send. Reminder stops on a review-link click or opt-out. A link click is **not** proof of a published review.
-- Branded public review page, direct one-tap Google link, optional token-protected private feedback. QR visitors receive the same public Google option without providing a rating or identifying themselves. Private feedback does not gate Google access.
-- Downloadable QR PNG and copyable iframe widget; widget shows the latest six synced reviews across all ratings. Uses escaped React text, no public customer information.
-- Counts, recent Google reviews, delivery states, link opens, opt-outs, feedback, owner email notifications, configurable branding/templates.
-- Suggested commercial tiers are presented in Settings: $299 setup + $79/month, $129/month premium. **No automated billing, subscriptions, premium report generation, or response-assistance service** is implemented; fulfill and invoice these manually.
+Onboard a real business, configure its direct Google review URL, brand and owner contacts, then connect its Business Profile. Supported direct links include `https://search.google.com/local/writereview?placeid=...` and `https://g.page/r/.../review`; generic Google homepages are rejected.
 
-## Messaging and operations
+## Core API contracts
 
-The queue claims at most ten due jobs per cron using `FOR UPDATE SKIP LOCKED`. Claimed jobs have a ten-minute lease. A job is marked `unknown` immediately before calling a provider; ambiguous network/provider failures are not automatically resent, preventing blind duplicate sends. Resend also uses message IDs as idempotency keys. Inspect unknown jobs in Review requests and reconcile with provider logs before changing status. Never requeue an unknown job without confirming no message was accepted. Failed jobs caused by missing configuration may be requeued by an operator after fixing configuration. Pre-network processing jobs abandoned on a crash can be reclaimed after ten minutes. Higher volume needs a dedicated worker and separate Google sync schedule; the MVP targets low-volume tenants.
+All owner mutations validate origin and tenant access server-side. Customer feedback and unsubscribe use public request capabilities; provider callbacks verify signatures; cron requires its secret.
 
-Provider callbacks update message delivery status. Sending acceptance is shown as `sent`, not `delivered`. Twilio STOP suppresses the number across the shared sender; email complaints/bounces suppress that address. Shared suppressions also apply to future imports. The customer unsubscribe link stops both channels for that business. Reimport cannot overwrite opted-out customers; duplicate contacts are rejected. Consent evidence beyond the recorded flag/timestamp remains the business's responsibility. No automatic re-subscription is provided.
+- `POST /api/requests/send`: `{customer_id,channel}` or `{customer:{name,phone,email,sms_consent,email_consent,consent_at,consent_source},channel}`. Channels: `sms`, `email`, `multi_channel`. New contacts are normalized and checked for consent; opt-outs win. Initial messages dispatch immediately. Response includes request ID and provider queue results. Inspect Delivery details to distinguish accepted, delivered, failed, and unknown messages.
+- `POST /api/customers/import`: `{csv,mapping,enroll,channel}`. Mapping keys: `name`, `phone`, `email`, `sms_consent`, `email_consent`, `consent_timestamp`; a mapped `consent` column can supply both flags when the underlying proof covers both channels. The CSV includes real original ISO timestamps. Maximum 500 rows/1 MB. Validation happens before persistence, and a database function imports atomically. Existing contacts retain consent/opt-outs and update their name. Conflicting duplicate identities reject the batch. Optional enrollment returns per-customer outcomes; one customer's ineligibility does not silently fail the others.
+- `GET /api/customers?page=0&search=Alex&opted_out=true`: paginated directory.
+- `GET/POST /api/templates`: per-channel, per-step templates with subjects and hourly delays. Initial delay is zero; follow-up is 1–336 hours. Variables: `{{customer_name}}`, `{{business_name}}`, `{{review_link}}`, `{{opt_out_text}}`; legacy variables remain supported. Sender name and opt-out instructions are enforced at send time even if removed from the editable template.
+- `POST /api/settings`, `/api/organization`, `/api/members`, `/api/reviews`, `/api/feedback/resolve`: branding/business configuration, validated tenant switch, role assignment, manual reply-assistance/widget visibility, and feedback resolution.
+- `GET /api/assets?format=png|svg|pdf`: printable tenant QR assets.
 
-Only the initial request's channel is used for its reminder. Templates get SMS STOP instructions or an email unsubscribe link appended. Google sync failures do not block other tenants; inspect the authenticated cron JSON for per-tenant sync failures and reconnect revoked accounts. Current sync imports Google-reported total/average and paginated recent reviews; historical deleted reviews are not purged from the local review cache in this MVP. The dashboard currently loads up to 500 customers and 200 records per activity collection; counts for contacted/delivery/link opens reflect loaded activity, while Google total comes from Google. Add server pagination/aggregates before a larger rollout.
+## Compliance and message semantics
 
-Maintain encrypted backups, Supabase backups/PITR as appropriate, provider error monitoring, and cron alerts before paid onboarding. Tenant offboarding/data export and deletion currently require an operator via Supabase; do not delete a shared provider identity when offboarding one tenant. Google OAuth disconnect/reconnect is handled by replacing the business connection; a self-service disconnect screen is not included.
+Every customer has immediate access to the Google review button, regardless of feedback or sentiment. No rating gate, incentives, AI public review posting, Yelp automation, social/ad management, card-data handling, or local ranking guarantees are included.
 
-## Product boundaries
+Consent records include channel flags, original timestamp, and source. A database trigger writes the audit event atomically. Do not import consent you do not have. US phones normalize to E.164; international numbers must include country code. Reimport never re-subscribes opted-out contacts.
 
-No AI public replies, Yelp automation, social media/ad management, review incentives, happy-customer routing, or local-ranking/review-count guarantees. Sell the operational workflow. Private feedback is optional and never changes public review access. Engineering/onboarding estimates supplied in the brief are planning estimates, not market evidence.
+Twilio STOP/UNSUBSCRIBE/CANCEL/END/QUIT suppress the destination for SMS across the shared sender. Email complaints/bounces suppress email. Database triggers immediately cancel queued/processing jobs for the affected channel. Public unsubscribe stops both channels for that business and records proof. Eligibility is checked again before provider calls. A provider call already in flight cannot be recalled.
 
-## Layout
+Requests support both channels and one follow-up per channel. Clicks stop all follow-ups; a click is **not** proof of a published review. Database claims use `FOR UPDATE SKIP LOCKED` and leases. Before network I/O a job is durably marked `unknown`; ambiguous outcomes are not blindly resent. Reconcile unknown jobs with provider logs. Resend requests also use idempotency keys. Twilio callbacks carry the local message ID to handle early delivery callbacks. Delivery statuses do not regress to sent when callbacks arrive early.
 
-- `app/` owner UI, public review/unsubscribe/widget pages, authenticated APIs, provider callbacks.
-- `lib/` session/tenant checks, validation, queue processing, encrypted Google integration.
-- `supabase/migrations/` schema, RLS, atomic onboarding/enqueue/queue claiming.
-- `tests/` workflow and database security checks.
+Owner alerts use a durable idempotent notification queue. SMS owner alerts require a configured owner number, explicit opt-in via the settings toggle, and approved Twilio setup. Suppressions apply to owner SMS too. Missing provider setup leaves owner notifications queued; failed/unknown provider outcomes are visible in the database for operator reconciliation.
 
-The Sites hosting workflow was not used: this deliverable preserves the explicitly requested Next.js + Supabase + Vercel architecture rather than converting it to a Cloudflare-hosted application.
+## Premium and billing
+
+Plans are recorded per tenant: Standard $79/month, Premium $129/month; the $299 setup fee has amount and paid-at tracking. Invoicing/payment collection remains external; the application never collects raw card data. Premium includes persisted monthly activity reports, email report notifications, report printing, and manual review-response draft/status tracking. Public replies are copied to Google manually, never generated or posted by AI.
+
+Monthly reports cover the preceding UTC calendar month and distinguish contacts, messages, link opens, opt-outs, new Google reviews, and feedback. Google aggregate totals come from Google. Dashboard delivery/click-through rates use database aggregates rather than a capped browser history. Activity feeds show recent records; the customer directory paginates the complete collection.
+
+## Verification
+
+```sh
+npm ci
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npx playwright install chromium
+npm run test:browser
+```
+
+Browser tests start the production server on port 3001. To use an existing Chromium installation: `CHROMIUM_PATH=/usr/bin/chromium npm run test:browser`. To test an existing server: set `TEST_BASE_URL`.
+
+The SQL tests execute every migration and repeat the seed in embedded PostgreSQL, exercising role boundaries, tenant isolation, opt-out cancellation, consent evidence, multi-channel enrollment, and metrics access. Browser tests exercise the dashboard routes, mobile layout, always-visible Google CTA, feedback, unsubscribe, template previews, quick-send demo, widget script, PNG/SVG/PDF downloads, and webhook/cron guards. See `VERIFICATION.md` and `audit-evidence/` for this run's results and screenshots.
+
+Live acceptance still requires your configured Supabase, Twilio, Resend, Google, and Vercel accounts: use two tenant accounts; send only to consented contacts you control; verify signed delivery callbacks, STOP/unsubscribe cancellation, Google OAuth/ingestion, owner alerts, reports, and cron behavior. No source build can prove carrier delivery, Google API approval, or production account configuration.
+
+Before paid onboarding, configure backups/PITR, error monitoring and cron alerts, a business retention policy, and operator procedures for data export/deletion and provider reconciliation. Do not delete a shared sending identity when offboarding a single tenant.

@@ -1,2 +1,44 @@
-import {owner,admin} from '@/lib/supabase';import {cookies} from 'next/headers';import {encrypt} from '@/lib/google';import {failure} from '@/lib/http';
-export async function GET(req:Request){try{const {orgId}=await owner();const url=new URL(req.url);const jar=await cookies();const state=jar.get('google_state')?.value;jar.delete('google_state');if(!state||state!==url.searchParams.get('state')||!url.searchParams.get('code'))throw new Error('Invalid OAuth state');const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',body:new URLSearchParams({code:url.searchParams.get('code')!,client_id:process.env.GOOGLE_CLIENT_ID!,client_secret:process.env.GOOGLE_CLIENT_SECRET!,redirect_uri:process.env.GOOGLE_REDIRECT_URI!,grant_type:'authorization_code'})});const tokens=await r.json();if(!r.ok||!tokens.refresh_token)throw new Error('Could not connect Google account');const {error}=await admin().from('google_connections').upsert({org_id:orgId,refresh_token:encrypt(tokens.refresh_token),location:'',last_sync:null});if(error)throw error;return Response.redirect(new URL('/?connected=google',req.url))}catch(e){return failure(e)}}
+import { manager, admin } from "@/lib/supabase";
+import { cookies } from "next/headers";
+import { encrypt } from "@/lib/google";
+import { failure } from "@/lib/http";
+export async function GET(req: Request) {
+  try {
+    const { orgId } = await manager();
+    const url = new URL(req.url);
+    const jar = await cookies();
+    const state = jar.get("google_state")?.value;
+    jar.delete("google_state");
+    if (
+      !state ||
+      state !== `${orgId}:${url.searchParams.get("state")}` ||
+      !url.searchParams.get("code")
+    )
+      throw new Error("Invalid OAuth state");
+    const r = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      body: new URLSearchParams({
+        code: url.searchParams.get("code")!,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+        grant_type: "authorization_code",
+      }),
+    });
+    const tokens = await r.json();
+    if (!r.ok || !tokens.refresh_token)
+      throw new Error("Could not connect Google account");
+    const { error } = await admin()
+      .from("google_connections")
+      .upsert({
+        org_id: orgId,
+        refresh_token: encrypt(tokens.refresh_token),
+        location: "",
+        last_sync: null,
+      });
+    if (error) throw error;
+    return Response.redirect(new URL("/?connected=google", req.url));
+  } catch (e) {
+    return failure(e);
+  }
+}

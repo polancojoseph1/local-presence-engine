@@ -1,20 +1,20 @@
-# Verification and handoff
+# Verification — 2026-10-31
 
-Verified in the build workspace:
+This implementation closes the original demo and functional gaps. See `REQUIREMENTS.md` for the specification mapping and `README.md` for setup.
+
+## Local results
 
 - `npm run typecheck`: passed.
-- `npm test`: all six tests passed, including the database isolation/queue test.
-- `npm run build`: production build passed for all application routes.
-- Production-server HTTP smoke checks: dashboard, login, review page, and widget returned 200 in unconfigured/demo mode; unauthenticated cron returned 401; unconfigured Google connection returned 400.
+- `npm run lint`: passed without warnings.
+- `npm test`: **8 passed, 0 failed**. Tests include all migrations, tenant/role isolation, protected metrics, consent evidence, atomic import rollback, opt-out preservation, multi-channel enrollment, immediate queued-message cancellation, click cancellation, repeated seed execution, template sender enforcement, phone normalization, direct Google URL validation, and token encryption/tampering.
+- `npm run build`: passed for the complete route set.
+- `CHROMIUM_PATH=/usr/bin/chromium npm run test:browser`: **4 test groups passed** against the production server. Checked dashboard routes, quick-send demo, template preview, always-visible Google CTA with negative feedback, unsubscribe, widget script/iframe, aggregate/review content, PNG/SVG/two-page PDF assets, mobile widths 320/375/768, and webhook/cron guards.
+- `git diff --check`: passed.
 
-Not verified: real SMS/email delivery, signed provider callback round trips, Google OAuth/review ingestion, Supabase-hosted migration/Auth behavior, and browser visual/accessibility interactions. These need configured services or browser access.
+Raw logs are under `audit-evidence/`. Browser screenshots: `dashboard-desktop.png`, `dashboard-mobile.png`, and `customer-review.png`. Sample data is visibly labeled and cannot send real campaign messages.
 
-GitHub write access has been restored and verified through the GitHub connector. The owner-created initial commit is preserved in the repository history alongside the application commits. Source repository: https://github.com/polancojoseph1/local-presence-engine.
+## Limits of this evidence
 
-No live Vercel/Supabase/Twilio/Resend/Google deployment has been activated. No service credentials are configured in this workspace. See README.md for exact setup and operating instructions. No customer messages were sent.
+No Supabase, Twilio, Resend, Google, or Vercel credentials are configured in this workspace. Hosted Supabase Auth/RLS, actual SMS/email delivery, signed provider round trips, Google OAuth/ingestion, owner-alert delivery and deployed cron execution were not live-tested. They require account setup and a consented acceptance test. The SQL tests use embedded PostgreSQL with an Auth stub; they are not a substitute for hosted account verification.
 
-## Dark theme and responsive layout update
-
-Replaced the owner and public-page palette with charcoal surfaces, blue accents, and amber review stars. Tablet/phone navigation uses a dismissible drawer, background scroll lock, Escape handling, and focus containment. Customer tables reflow into labeled cards on phones. Layouts use breakpoints from 320px through wide desktops; forms, dialogs, review cards, and QR assets adapt without dropping content. Default brand color for new organizations is blue via migration 002.
-
-TypeScript, production build, and existing automated tests pass. Default button/text palette contrast ratios were checked (all checked normal-text combinations exceed 4.5:1). Generated HTML includes viewport metadata, the dark theme, mobile table labels, and accessible navigation controls. Actual browser/device rendering could not be checked because no browser automation connection is available in this environment.
+No customer messages were sent, no raw card data is collected, and no public deployment was activated. Source push and local passing tests do not by themselves activate services or prove commercial outcomes.

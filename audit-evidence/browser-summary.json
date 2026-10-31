@@ -1,0 +1,36 @@
+{
+  "stats": {
+    "startTime": "2026-10-31T05:24:18.812Z",
+    "duration": 10123.591,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "tests": [
+    {
+      "title": "owner dashboard, customer feedback and one-tap review demo",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "dashboard routes and live template preview",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "public QR, widget script and real downloadable assets",
+      "results": [
+        "passed"
+      ]
+    },
+    {
+      "title": "mobile layout and provider/cron access guards",
+      "results": [
+        "passed"
+      ]
+    }
+  ]
+}

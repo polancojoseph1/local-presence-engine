@@ -1,2 +1,2 @@
-name,email,phone,email_consent,sms_consent
-Example Customer,customer@example.com,+12025550123,false,false
+name,phone,email,sms_consent,email_consent,consent_timestamp
+Alex Rivera,+12125550123,alex@example.com,true,true,2026-10-01T14:00:00Z

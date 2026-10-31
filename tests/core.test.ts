@@ -1,6 +1,70 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {eligible,renderTemplate,customerSchema,googleLink} from '../lib/core';import {encrypt,decrypt} from '../lib/google';
-test('consent is per channel and opt-out always wins',()=>{const c={opted_out:false,sms_consent:false,email_consent:true,phone:'+12025550123',email:'a@example.com'};assert.equal(eligible(c,'sms'),false);assert.equal(eligible(c,'email'),true);assert.equal(eligible({...c,opted_out:true},'email'),false);assert.equal(eligible({...c,email:null},'email'),false)});
-test('imports reject invalid contact data and default consent off',()=>{assert.equal(customerSchema.safeParse({name:'Jane',phone:'2025550123'}).success,false);assert.equal(customerSchema.safeParse({name:'Jane'}).success,false);assert.equal(customerSchema.parse({name:'Jane',email:'jane@example.com'}).sms_consent,false);assert.equal(customerSchema.safeParse({name:'Jane',email:'invalid'}).success,false)});
-test('Google destination rejects deceptive hosts and executable URLs',()=>{for(const s of ['javascript:alert(1)','https://google.com.evil.test','http://g.page/test','https://evil.test'])assert.equal(googleLink(s),false);assert.equal(googleLink('https://search.google.com/local/writereview?placeid=123'),true)});
-test('templates replace literal placeholders without treating values as regex replacements',()=>assert.equal(renderTemplate('{{name}} at {{business}}: {{link}}','A$&','Shop','https://example.com'),'A$& at Shop: https://example.com'));
-test('Google refresh tokens are encrypted and tamper-evident',()=>{process.env.TOKEN_ENCRYPTION_KEY='ab'.repeat(32);const encrypted=encrypt('secret-refresh-token');assert.equal(decrypt(encrypted),'secret-refresh-token');assert.equal(encrypted.includes('secret'),false);const b=Buffer.from(encrypted,'base64');b[15]^=1;assert.throws(()=>decrypt(b.toString('base64')))});
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  eligible,
+  renderTemplate,
+  customerSchema,
+  googleLink,
+} from "../lib/core";
+import { encrypt, decrypt } from "../lib/google";
+test("consent is per channel and opt-out always wins", () => {
+  const c = {
+    opted_out: false,
+    sms_consent: false,
+    email_consent: true,
+    phone: "+12025550123",
+    email: "a@example.com",
+  };
+  assert.equal(eligible(c, "sms"), false);
+  assert.equal(eligible(c, "email"), true);
+  assert.equal(eligible({ ...c, opted_out: true }, "email"), false);
+  assert.equal(eligible({ ...c, email: null }, "email"), false);
+});
+test("imports reject invalid contact data and default consent off", () => {
+  assert.equal(
+    customerSchema.safeParse({ name: "Jane", phone: "2025550123" }).success,
+    false,
+  );
+  assert.equal(customerSchema.safeParse({ name: "Jane" }).success, false);
+  assert.equal(
+    customerSchema.parse({ name: "Jane", email: "jane@example.com" })
+      .sms_consent,
+    false,
+  );
+  assert.equal(
+    customerSchema.safeParse({ name: "Jane", email: "invalid" }).success,
+    false,
+  );
+});
+test("Google destination rejects deceptive hosts and executable URLs", () => {
+  for (const s of [
+    "javascript:alert(1)",
+    "https://google.com.evil.test",
+    "http://g.page/test",
+    "https://evil.test",
+  ])
+    assert.equal(googleLink(s), false);
+  assert.equal(
+    googleLink("https://search.google.com/local/writereview?placeid=123"),
+    true,
+  );
+});
+test("templates replace literal placeholders without treating values as regex replacements", () =>
+  assert.equal(
+    renderTemplate(
+      "{{name}} at {{business}}: {{link}}",
+      "A$&",
+      "Shop",
+      "https://example.com",
+    ),
+    "A$& at Shop: https://example.com",
+  ));
+test("Google refresh tokens are encrypted and tamper-evident", () => {
+  process.env.TOKEN_ENCRYPTION_KEY = "ab".repeat(32);
+  const encrypted = encrypt("secret-refresh-token");
+  assert.equal(decrypt(encrypted), "secret-refresh-token");
+  assert.equal(encrypted.includes("secret"), false);
+  const b = Buffer.from(encrypted, "base64");
+  b[15] ^= 1;
+  assert.throws(() => decrypt(b.toString("base64")));
+});
