@@ -116,6 +116,32 @@ test("upgraded schema: roles, multi-tenant metrics, immediate cancellation, seed
         .length,
       4,
     );
+    await db.exec("set role authenticated");
+    assert.equal(
+      (
+        await db.query<{ m: { contacted: number } }>(
+          `select dashboard_metrics($1) m`,
+          [a],
+        )
+      ).rows[0].m.contacted,
+      0,
+    );
+    await db.exec("reset role");
+    await db.query(
+      `update messages set status='sent',sent_at=now() where request_id=$1 and channel='email' and step=0`,
+      [rid],
+    );
+    await db.exec("set role authenticated");
+    assert.equal(
+      (
+        await db.query<{ m: { contacted: number } }>(
+          `select dashboard_metrics($1) m`,
+          [a],
+        )
+      ).rows[0].m.contacted,
+      1,
+    );
+    await db.exec("reset role");
     await db.query(`select suppress_contact('+12125550123','sms','test')`);
     assert.equal(
       (
@@ -133,7 +159,7 @@ test("upgraded schema: roles, multi-tenant metrics, immediate cancellation, seed
           [rid],
         )
       ).rows[0].n,
-      2,
+      1,
     );
     await db.query(`update requests set clicked_at=now() where id=$1`, [rid]);
     assert.equal(

@@ -41,7 +41,7 @@ export async function owner() {
   if (!user) throw new Error("Unauthorized");
   const jar = await cookies();
   let orgId = jar.get("organization_id")?.value;
-  const { data: operator } = await db
+  const { data: operator, error: operatorError } = await db
     .from("operators")
     .select("user_id")
     .eq("user_id", user.id)
@@ -51,7 +51,19 @@ export async function owner() {
     .select("org_id,role")
     .eq("user_id", user.id);
   if (error) throw error;
-  if (!orgId) orgId = members?.[0]?.org_id;
+  if (operatorError) throw operatorError;
+  if (!orgId || (!operator && !members?.some((m) => m.org_id === orgId)))
+    orgId = members?.[0]?.org_id;
+  if (operator && !orgId) {
+    const { data: first, error: firstError } = await db
+      .from("organizations")
+      .select("id")
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+    if (firstError) throw firstError;
+    orgId = first?.id;
+  }
   const member = members?.find((m) => m.org_id === orgId);
   if (!orgId || (!member && !operator))
     throw new Error("Create your organization first.");

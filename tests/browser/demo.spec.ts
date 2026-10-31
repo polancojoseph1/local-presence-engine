@@ -26,7 +26,7 @@ test("owner dashboard, customer feedback and one-tap review demo", async ({
     .getByLabel("Your feedback", { exact: true })
     .fill("The appointment started late.");
   await page.getByRole("button", { name: "Send privately" }).click();
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.locator("details").getByRole("status")).toContainText(
     "Demo feedback received",
   );
   await expect(google).toBeEnabled();
@@ -37,6 +37,18 @@ test("owner dashboard, customer feedback and one-tap review demo", async ({
   await google.click();
   await expect(
     page.getByRole("heading", { name: "One tap to Google." }),
+  ).toBeVisible();
+  await page.goto("/r/demo-visit");
+  await page
+    .getByRole("button", { name: "Unsubscribe from future requests" })
+    .click();
+  await expect(
+    page.getByText(
+      "You’re unsubscribed from future requests from this business.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Leave us a Google Review" }),
   ).toBeVisible();
   await page.goto("/unsubscribe?t=demo-visit");
   await page.getByRole("button", { name: "Unsubscribe", exact: true }).click();

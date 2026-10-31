@@ -37,6 +37,8 @@ export async function runQueue(requestId?: string) {
         .maybeSingle();
       if (se) throw se;
       if (
+        !c.consent_at ||
+        !c.consent_source ||
         suppressed ||
         !eligible(c, job.channel) ||
         (job.step > 0 && r.clicked_at)

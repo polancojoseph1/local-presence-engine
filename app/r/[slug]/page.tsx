@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Feedback from "./feedback";
+import UnsubscribeButton from "./unsubscribe";
 import { googleLink } from "@/lib/core";
 import { publicBusiness } from "@/lib/public";
 export default async function Review({
@@ -61,13 +62,7 @@ export default async function Review({
       </p>
       <Feedback token={token} slug={o.slug} demo={demo} />
       <footer>
-        {token && (
-          <p>
-            <a href={`/unsubscribe?t=${token}`}>
-              Unsubscribe from future requests
-            </a>
-          </p>
-        )}
+        {token && <UnsubscribeButton token={token} demo={demo} />}
         Powered by LocalLoop · No incentives. Just honest feedback.
       </footer>
     </main>

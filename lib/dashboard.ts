@@ -75,6 +75,15 @@ export async function dashboardData(): Promise<DashboardData | null> {
     .eq("user_id", user.id)
     .maybeSingle();
   if (!members?.length && !operator) return null;
+  if (!members?.length && operator) {
+    const { data: first, error: firstError } = await db
+      .from("organizations")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+    if (firstError) throw firstError;
+    if (!first) return null;
+  }
   const ctx = await owner();
   const oid = ctx.orgId;
   const results = await Promise.all(

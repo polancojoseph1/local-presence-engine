@@ -18,3 +18,5 @@ Raw logs are under `audit-evidence/`. Browser screenshots: `dashboard-desktop.pn
 No Supabase, Twilio, Resend, Google, or Vercel credentials are configured in this workspace. Hosted Supabase Auth/RLS, actual SMS/email delivery, signed provider round trips, Google OAuth/ingestion, owner-alert delivery and deployed cron execution were not live-tested. They require account setup and a consented acceptance test. The SQL tests use embedded PostgreSQL with an Auth stub; they are not a substitute for hosted account verification.
 
 No customer messages were sent, no raw card data is collected, and no public deployment was activated. Source push and local passing tests do not by themselves activate services or prove commercial outcomes.
+
+Follow-up verification also covers one-tap unsubscribe directly from the request-page footer, operator first-login workspace selection, blocking legacy jobs without consent evidence, and excluding queued-only requests from customers-contacted metrics. All checks and browser groups pass after these changes.
